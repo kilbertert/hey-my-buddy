@@ -633,23 +633,27 @@ def _catalog(connection: Connection, version: str | None, provider: str | None) 
     return catalog, listed_ids
 
 
-def _discovery_account_status(account) -> str:
+def _discovery_account_status(account, *, requires_openai_auth: object = None,
+                              provider: str | None = None) -> str:
     """The same session's account fact, reported and never judged (ADR-027).
 
     A chatgpt account whose plan the readback does not name — the field
     missing, empty or ``unknown`` — stays an unknown account; type alone never
     confirms it; the board decides whether to trust any reading.
+    A custom non-OpenAI provider whose native ``account/read`` explicitly
+    reports ``requiresOpenaiAuth: false`` does not require an OpenAI account.
     """
-    if not isinstance(account, dict):
+    if isinstance(account, dict):
+        if account.get("type") == "apiKey":
+            return "confirmed"
+        if account.get("type") == "chatgpt":
+            plan = account.get("planType")
+            if isinstance(plan, str) and plan and plan != "unknown":
+                return "confirmed"
         return "unknown"
-    if account.get("type") == "apiKey":
+    if requires_openai_auth is False and isinstance(provider, str) and provider and provider != "openai":
         return "confirmed"
-    if account.get("type") != "chatgpt":
-        return "unknown"
-    plan = account.get("planType")
-    if not isinstance(plan, str) or not plan or plan == "unknown":
-        return "unknown"
-    return "confirmed"
+    return "unknown"
 
 
 def _initialize(connection: Connection, prep: _Preparation, mode: str, spec: dict,
@@ -2197,12 +2201,17 @@ def run_discovery(*, cwd: str, invocation_root: Path, native_root: Path,
     with _control_connection(cwd=cwd, invocation_root=invocation_root, native_root=native_root,
                              timeout_seconds=timeout_seconds, cancelled=cancelled) as (connection, version, facts):
         try:
-            account = connection.call("account/read", {"refreshToken": False}).get("account")
+            account_reply = connection.call("account/read", {"refreshToken": False})
+            account = account_reply.get("account") if isinstance(account_reply, dict) else None
+            requires_openai_auth = account_reply.get("requiresOpenaiAuth") if isinstance(account_reply, dict) else None
         except CodexProtocolError:
             account = None
-        account_status = _discovery_account_status(account)
+            requires_openai_auth = None
         configured = connection.call("config/read", {"cwd": cwd, "includeLayers": False}).get("config")
         provider = native_provider(configured) if isinstance(configured, dict) else None
+        account_status = _discovery_account_status(
+            account, requires_openai_auth=requires_openai_auth, provider=provider,
+        )
         catalog_value, _listed_ids = _catalog(connection, version, provider)
         from ....protocol.billing import codex_account, fact
         observed_at = utc_now()

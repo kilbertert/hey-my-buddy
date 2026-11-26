@@ -175,6 +175,13 @@ class HarnessDiscoveryTests(unittest.TestCase):
             self.assertEqual(result["status"], "login-required")
             self.assertFalse(result["available"])
             self.assertNotIn("private-account", str(result))
+            self.plain_file(cli, "import sys\nprint(\"codex-cli 0.172.0\" if sys.argv[1:] == [\"--version\"] else \"API key configured - sk-***\\nAuthentication is checked when you send a request.\")\n")
+            with patch.object(harness_locations, "_home", return_value=home), patch.object(
+                harness_locations, "_common_dirs", return_value=[]
+            ), patch.object(harness_locations, "_app_paths", return_value=[]):
+                result = discovery.discover("codex", manual_path=str(cli), environment={"PATH": ""}, state_dir=Path(os.environ["HMB_STATE_DIR"]))
+            self.assertEqual(result["status"], "ready")
+            self.assertTrue(result["available"])
             self.plain_file(cli, "print(\"secret\" * 10000)\n")
             with patch.object(harness_locations, "_home", return_value=home), patch.object(
                 harness_locations, "_common_dirs", return_value=[]

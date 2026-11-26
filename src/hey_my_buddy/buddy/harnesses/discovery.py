@@ -615,7 +615,7 @@ def _candidate_handshake(harness: str, candidate: dict, environment: dict, deadl
                     result["status"] = "unknown"
                 result["reason"] = _probe_reason(code)
                 return result
-            if "logged in" not in status:
+            if "logged in" not in status and "api key configured" not in status:
                 result["reason"] = _probe_reason("auth-unverified")
                 return result
         elif harness == "claude":
