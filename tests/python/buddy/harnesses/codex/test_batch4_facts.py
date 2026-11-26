@@ -397,6 +397,24 @@ class NativeFactsTests(unittest.TestCase):
         self.assertIsNone(result.native_evidence.unknown_events)
         self.assertNotIn("nativeEvidence", run_execution._base_result(result))
 
+    def test_custom_provider_without_openai_auth_confirms_account_status(self):
+        self.assertEqual(
+            native_run._discovery_account_status(None, requires_openai_auth=False, provider="cliproxyapi"),
+            "confirmed",
+        )
+        self.assertEqual(
+            native_run._discovery_account_status(None, requires_openai_auth=False, provider="openai"),
+            "unknown",
+        )
+        self.assertEqual(
+            native_run._discovery_account_status(None, requires_openai_auth=True, provider="cliproxyapi"),
+            "unknown",
+        )
+        self.assertEqual(
+            native_run._discovery_account_status({"type": "apiKey"}, requires_openai_auth=False, provider="openai"),
+            "confirmed",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
